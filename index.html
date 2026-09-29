@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title id="page-title">Plataforma Multitienda</title>
+    <link id="favicon-link" rel="icon" type="image/png" href="https://via.placeholder.com/32">
+    <!-- Librería CropperJS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Lato&family=Montserrat:ital,wght@0,400;0,700;1,400&family=Open+Sans:ital,wght@0,400;0,600;1,400&family=Pacifico&family=Playball&family=Poppins:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #1a1a1a;
+            --accent: #ff3366;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --font-title: 'Montserrat', sans-serif;
+            --font-text: 'Open Sans', sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: var(--font-text);
+            background-color: var(--bg);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            -webkit-tap-highlight-color: transparent;
+        }
+        h1, h2, h3, h4, h5, h6, .product-title { font-family: var(--font-title); }
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo-img { height: 35px; object-fit: contain; cursor: pointer; }
+        header h1 { margin: 0; font-size: 1.2rem; cursor: pointer; }
+        .nav-actions { display: flex; gap: 10px; align-items: center; }
+        .cart-btn { background: var(--accent); color: white; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
+        
+        .container { max-width: 1200px; margin: 1rem auto; padding: 0 10px; flex: 1; width: 100%; }
+        
+        .catalog-header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem; }
+        .search-bar { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem; font-family: var(--font-text); }
+        .filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
+        .filter-btn { background: white; border: 1px solid #ddd; padding: 6px 12px; border-radius: 15px; cursor: pointer; white-space: nowrap; font-size: 0.85rem; font-family: var(--font-text); }
+        .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+        @media(min-width: 768px) { .product-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; } }
+        
+        .product-card { background: var(--card-bg); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; position: relative; }
+        .product-card.inactive { opacity: 0.5; filter: grayscale(1); }
+        .product-img { width: 100%; height: 160px; object-fit: cover; background: #eee; cursor: pointer; }
+        @media(min-width: 768px) { .product-img { height: 200px; } }
+        
+        .product-info { padding: 10px; display: flex; flex-direction: column; flex: 1; }
+        .product-ref { font-size: 0.75rem; color: #888; font-weight: bold; margin-bottom: 2px; }
+        .product-title { font-size: 1rem; font-weight: bold; margin: 0 0 4px 0; }
+        .product-desc { font-size: 0.8rem; opacity: 0.8; margin-bottom: 8px; flex: 1; }
+        .price-box { font-size: 1rem; font-weight: bold; color: var(--accent); margin-bottom: 6px; }
+        
+        .btn-add { background: var(--primary); color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 0.85rem; }
+
+        .view { display: none; }
+        .view.active { display: block; }
+
+        .cart-drawer-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: none; }
+        .cart-drawer-overlay.open { display: block; }
+        .cart-drawer { position: fixed; top: 0; right: -100%; width: 100%; max-width: 400px; height: 100%; background: white; z-index: 1001; box-shadow: -2px 0 10px rgba(0,0,0,0.1); transition: right 0.3s ease; display: flex; flex-direction: column; }
+        .cart-drawer.open { right: 0; }
+        .cart-header { padding: 15px; background: var(--primary); color: white; display: flex; justify-content: space-between; align-items: center; }
+        .cart-body { padding: 15px; flex: 1; overflow-y: auto; color: var(--text-color); }
+        .cart-footer { padding: 15px; background: #f1f1f1; border-top: 1px solid #ddd; }
+
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; font-size: 0.85rem; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f1f1f1; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 4px; font-weight: 500; font-size: 0.9rem; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 0.9rem; font-family: var(--font-text); }
+        .btn-primary { background: var(--accent); color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 0.95rem; }
+
+        #cropper-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: none; justify-content: center; align-items: center; padding: 20px; }
+        .cropper-container-box { background: white; padding: 15px; border-radius: 8px; max-width: 500px; width: 100%; display: flex; flex-direction: column; gap: 10px; max-height: 90vh; color: #333; }
+        .img-container { max-height: 350px; width: 100%; }
+        .img-container img { max-width: 100%; display: block; }
+
+        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 3000; display: flex; flex-direction: column; gap: 8px; width: 90%; max-width: 400px; pointer-events: none; }
+        .toast { background: var(--primary); color: white; padding: 12px 16px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 0.9rem; pointer-events: auto; animation: fadeInOut 3s forwards; border-left: 5px solid var(--accent); }
+        @keyframes fadeInOut { 0% { opacity: 0; transform: translateY(20px); } 15% { opacity: 1; transform: translateY(0); } 85% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-20px); } }
+
+        footer { padding: 20px; text-align: center; background: var(--primary); color: #fff; margin-top: auto; }
+        .social-icons { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; font-size: 1.2rem; }
+        #secret-trigger { opacity: 0.08; cursor: pointer; font-size: 12px; user-select: none; transition: opacity 0.3s; display: inline-block; margin-top: 10px; }
+        #secret-trigger:hover { opacity: 1; }
+
+        .admin-tabs { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; }
+        .admin-tab-btn { background: #ddd; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; white-space: nowrap; color: #333; font-family: var(--font-title); font-weight: bold;}
+        .admin-tab-btn.active { background: var(--accent); color: white; }
+        .admin-section { display: none; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #333; }
+        .admin-section.active { display: block; }
+
+        .dash-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        .dash-card { background: var(--bg); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #eee; border-left: 4px solid var(--accent); }
+        .dash-card h4 { margin: 0 0 5px 0; font-size: 0.85rem; color: #666; }
+        .dash-card .val { font-size: 1.2rem; font-weight: bold; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <img id="header-logo" class="logo-img" style="display:none;" onclick="cambiarVista('catalog')">
+            <h1 id="header-title" onclick="cambiarVista('catalog')">Mi Tienda</h1>
+        </div>
+        <div class="nav-actions">
+            <button class="cart-btn" onclick="toggleCartDrawer(true)">🛒 <span id="cart-count">0</span></button>
+        </div>
+    </header>
+
+    <div class="container">
+        
+        <!-- VISTA CATÁLOGO CLIENTE -->
+        <div id="view-catalog" class="view active">
+            <div class="catalog-header">
+                <input type="text" id="search-input" class="search-bar" placeholder="🔍 Buscar por nombre, descripción o referencia..." oninput="renderCatalog()">
+                <div class="filters" id="category-filters"></div>
+            </div>
+            <div class="product-grid" id="product-grid"></div>
+        </div>
+
+        <!-- PANEL SUPERADMIN (Global) -->
+        <div id="view-superadmin" class="view">
+            <h2>Panel Superadmin (Global)</h2>
+            <p>Gestiona todas las tiendas de la red desde aquí.</p>
+            <div style="background:white; padding:15px; border-radius:8px; margin-bottom:20px;">
+                <h3>Crear Nueva Tienda</h3>
+                <form id="superadmin-form" onsubmit="crearTiendaSuperadmin(event)">
+                    <div class="form-group">
+                        <label>Identificador Único (Slug sin espacios, ej: boutique-carlos)</label>
+                        <input type="text" id="sa-slug" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre de la Tienda</label>
+                        <input type="text" id="sa-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>País</label>
+                        <select id="sa-country">
+                            <option value="Colombia">Colombia</option>
+                            <option value="Venezuela">Venezuela</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Moneda Base</label>
+                        <select id="sa-currency">
+                            <option value="USD">Dólares (USD)</option>
+                            <option value="COP">Pesos Colombianos (COP)</option>
+                            <option value="BS">Bolívares (BS)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>WhatsApp de Contacto</label>
+                        <input type="text" id="sa-wa" required>
+                    </div>
+                    <button type="submit" class="btn-primary">✨ Crear Tienda y Generar Link</button>
+                </form>
+            </div>
+            <h3>Tiendas Registradas</h3>
+            <div id="superadmin-stores-list" style="overflow-x:auto;"></div>
+        </div>
+
+        <!-- PANEL ADMIN DE TIENDA -->
+        <div id="view-admin" class="view">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+                <h2 id="admin-store-title-label">Panel de Administración</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-primary" onclick="cambiarVista('catalog')" style="width: auto; background: #666;">Ver Catálogo</button>
+                    <button class="btn-primary" onclick="cerrarSesionAdmin()" style="width: auto; background: red;">Cerrar Sesión</button>
+                </div>
+            </div>
+            
+            <div class="admin-tabs">
+                <button class="admin-tab-btn active" onclick="cambiarTabAdmin('productos')">📦 Productos</button>
+                <button class="admin-tab-btn" onclick="cambiarTabAdmin('pedidos')">📊 Pedidos & Dashboard</button>
+                <button class="admin-tab-btn" onclick="cambiarTabAdmin('clientes')">👥 Clientes</button>
+                <button class="admin-tab-btn" onclick="cambiarTabAdmin('config')">⚙️ Configuración</button>
+            </div>
+
+            <!-- PRODUCTOS ADMIN -->
+            <div id="admin-sec-productos" class="admin-section active">
+                <h3 id="form-product-title">Agregar Nuevo Producto</h3>
+                <form id="product-form" onsubmit="guardarProducto(event)">
+                    <input type="hidden" id="p-edit-id">
+                    <div class="form-group">
+                        <label>Título del Producto</label>
+                        <input type="text" id="p-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Categoría</label>
+                        <input type="text" id="p-category" list="category-list" placeholder="Ej: Ropa, Accesorios..." required>
+                        <datalist id="category-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción</label>
+                        <textarea id="p-desc" rows="2" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Imagen (Subir, Arrastrar o Pegar con Ctrl+V)</label>
+                        <div id="drop-zone" style="border: 2px dashed #ccc; padding: 20px; text-align: center; border-radius: 6px; background: #fafafa; cursor: pointer;">
+                            Haz clic, arrastra una imagen o pega con Ctrl+V
+                            <input type="file" id="p-img-file" accept="image/*" style="display:none;" onchange="cargarImagenInput(this)">
+                        </div>
+                        <div id="img-preview-container" style="margin-top: 10px; text-align: center; display:none;">
+                            <img id="img-preview" style="max-height: 120px; border-radius: 4px;">
+                            <br><button type="button" onclick="abrirRecortadorActual()" style="margin-top:5px; font-size:0.8rem; background:#666; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">✂️ Recortar imagen</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Precio Regular</label>
+                        <input type="number" id="p-price" step="0.01" required>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <button type="submit" class="btn-primary" id="btn-guardar-prod">Guardar Producto</button>
+                        <button type="button" id="btn-cancelar-edit" style="display:none; background:#888; color:white; border:none; padding:10px; border-radius:4px; cursor:pointer;" onclick="cancelarEdicionProd()">Cancelar</button>
+                    </div>
+                </form>
+
+                <hr style="margin: 30px 0; border:0; border-top:1px solid #ddd;">
+                <h3>Listado de Productos</h3>
+                <input type="text" id="admin-search-prod" class="search-bar" placeholder="🔍 Buscar producto..." oninput="renderAdminProductos()" style="margin-bottom: 10px;">
+                <div id="admin-product-list" style="overflow-x:auto;"></div>
+            </div>
+
+            <!-- PEDIDOS & DASHBOARD -->
+            <div id="admin-sec-pedidos" class="admin-section">
+                <h3>Dashboard</h3>
+                <div class="dash-cards">
+                    <div class="dash-card">
+                        <h4>Ventas Totales</h4>
+                        <div class="val" id="dash-ventas-semana">0</div>
+                    </div>
+                    <div class="dash-card">
+                        <h4>Ingresos Totales</h4>
+                        <div class="val" id="dash-ingresos-mes">$0</div>
+                    </div>
+                </div>
+                <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+                <h3>Historial de Pedidos</h3>
+                <div id="admin-orders-list" style="overflow-x:auto;"></div>
+            </div>
+
+            <!-- CLIENTES -->
+            <div id="admin-sec-clientes" class="admin-section">
+                <h3>Clientes</h3>
+                <input type="text" id="admin-search-client" class="search-bar" placeholder="🔍 Buscar cliente..." oninput="renderAdminClientes()" style="margin-bottom: 15px;">
+                <div id="admin-clients-list" style="overflow-x:auto;"></div>
+            </div>
+
+            <!-- CONFIGURACIÓN -->
+            <div id="admin-sec-config" class="admin-section">
+                <form id="config-form" onsubmit="guardarConfiguracion(event)">
+                    <h3>Identidad y Marca</h3>
+                    <div class="form-group">
+                        <label>Título de la Tienda (Title)</label>
+                        <input type="text" id="cfg-store-title">
+                    </div>
+                    <div class="form-group">
+                        <label>Moneda Base</label>
+                        <select id="cfg-currency-base">
+                            <option value="USD">Dólares (USD)</option>
+                            <option value="COP">Pesos (COP)</option>
+                            <option value="BS">Bolívares (BS)</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <div class="form-group" style="flex:1;">
+                            <label>Color Primario</label>
+                            <input type="color" id="cfg-primary-picker" onchange="syncColorInput('primary', this.value)" style="width:100%; height:40px; cursor:pointer;">
+                            <input type="text" id="cfg-primary" style="margin-top:5px;">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>Color Acento</label>
+                            <input type="color" id="cfg-accent-picker" onchange="syncColorInput('accent', this.value)" style="width:100%; height:40px; cursor:pointer;">
+                            <input type="text" id="cfg-accent" style="margin-top:5px;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Logo de la Tienda (Archivo)</label>
+                        <input type="file" id="cfg-logo-file" accept="image/*">
+                    </div>
+                    <div class="form-group">
+                        <label>Favicon de la Tienda (Archivo)</label>
+                        <input type="file" id="cfg-favicon-file" accept="image/*">
+                    </div>
+                    <div class="form-group">
+                        <label>WhatsApp de la Tienda</label>
+                        <input type="text" id="cfg-wa">
+                    </div>
+                    <div class="form-group">
+                        <label>Nueva Contraseña Admin (PIN)</label>
+                        <input type="password" id="cfg-new-pin" placeholder="Dejar en blanco para no cambiar">
+                    </div>
+                    <button type="submit" class="btn-primary">💾 Guardar Configuración</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <div class="social-icons" id="footer-socials"></div>
+        <p id="footer-copy">© 2026 Multitienda.</p>
+        <div><span id="secret-trigger" title="Admin">🔒</span></div>
+    </footer>
+
+    <!-- CARRITO LATERAL -->
+    <div class="cart-drawer-overlay" id="cart-overlay" onclick="toggleCartDrawer(false)"></div>
+    <div class="cart-drawer" id="cart-drawer">
+        <div class="cart-header">
+            <h3 style="margin:0; font-family:var(--font-title);">Tu Pedido</h3>
+            <button onclick="toggleCartDrawer(false)" style="background:none; border:none; color:white; font-size:1.2rem; cursor:pointer;">✕</button>
+        </div>
+        <div class="cart-body" id="cart-drawer-content"></div>
+        <div class="cart-footer" id="cart-drawer-footer" style="display:none;">
+            <div id="cart-client-form" style="margin-bottom:10px;">
+                <input type="text" id="client-name" placeholder="Tu Nombre y Apellido" style="width:100%; padding:8px; margin-bottom:8px; border:1px solid #ccc; border-radius:4px;">
+                <input type="tel" id="client-phone" placeholder="Tu Teléfono / WhatsApp" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+            <div style="font-weight:bold; margin-bottom:10px; font-size:1.1rem;" id="cart-total-text">Total: 0</div>
+            <button class="btn-primary" onclick="enviarWhatsApp()" style="background: #25d366; font-size: 1rem; padding: 12px; border-radius: 8px;">Enviar Pedido por WhatsApp 📲</button>
+        </div>
+    </div>
+
+    <!-- MODAL RECORTE -->
+    <div id="cropper-modal">
+        <div class="cropper-container-box">
+            <h3>Recortar Imagen</h3>
+            <div class="img-container"><img id="image-to-crop"></div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button type="button" onclick="cerrarRecortador()" style="padding:8px 16px; background:#888; color:white; border:none; border-radius:4px; cursor:pointer;">Cancelar</button>
+                <button type="button" onclick="guardarRecorte()" style="padding:8px 16px; background:var(--accent); color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Recortar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+    <script>
+        // CONFIGURA TUS CREDENCIALES DE SUPABASE AQUÍ
+        const SUPABASE_URL = 'https://wsphbeoeshcurqutbecl.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzcGhiZW9lc2hjdXJxdXRiZWNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2OTM1ODksImV4cCI6MjEwNjI2OTU4OX0.9lmbCEGivxJXiIxPWBBULpgiMlQfwxfc10ul1yoyZOI';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const storeSlug = urlParams.get('t');
+
+        let currentStoreData = null;
+        let configMarca = {};
+        let productos = [];
+        let carrito = [];
+        let pedidos = [];
+        let clientes = [];
+        let categoriaActual = 'todos';
+        let imagenBase64Actual = '';
+        let cropper = null;
+        let adminAutenticado = false;
+
+        async function initApp() {
+            if (!storeSlug) {
+                document.body.innerHTML = `<div style="text-align:center; margin-top:50px; font-family:sans-serif;"><h2>Bienvenido a la plataforma multitienda</h2><p>Por favor ingresa con el enlace de tu tienda (ej: <code>?t=tu-tienda</code>) o accede al Superadmin (<code>?t=superadmin</code>).</p></div>`;
+                return;
+            }
+
+            if (storeSlug === 'superadmin') {
+                cambiarVista('superadmin');
+                cargarListaSuperadmin();
+                return;
+            }
+
+            const { data, error } = await supabaseClient
+                .from('tiendas')
+                .select('*')
+                .eq('id', storeSlug)
+                .single();
+
+            if (error || !data) {
+                document.body.innerHTML = `<div style="text-align:center; margin-top:50px; font-family:sans-serif;"><h2>Tienda no encontrada</h2><p>La tienda "${storeSlug}" no existe o fue eliminada.</p></div>`;
+                return;
+            }
+
+            currentStoreData = data;
+            // PIN por defecto: 1234 (hash SHA-256: 03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4)
+            configMarca = data.config || { primary: '#1a1a1a', accent: '#ff3366', currencyBase: 'USD', adminPinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4' };
+            productos = data.productos || [];
+            pedidos = data.pedidos || [];
+            clientes = data.clientes || [];
+            carrito = JSON.parse(localStorage.getItem('cart_' + storeSlug)) || [];
+
+            aplicarConfiguracionMarca();
+            renderCatalog();
+            actualizarContadorCarrito();
+        }
+
+        async function sincronizarConSupabase() {
+            if (!storeSlug || storeSlug === 'superadmin') return;
+            await supabaseClient
+                .from('tiendas')
+                .update({
+                    config: configMarca,
+                    productos: productos,
+                    pedidos: pedidos,
+                    clientes: clientes
+                })
+                .eq('id', storeSlug);
+        }
+
+        function mostrarAlerta(mensaje) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerText = mensaje;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        async function hashPin(pin) {
+            const msgBuffer = new TextEncoder().encode(pin);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function formatPrice(valorBase) {
+            let num = Number(valorBase);
+            let moneda = configMarca.currencyBase || 'USD';
+            return `${moneda} ${num.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+        }
+
+        function aplicarConfiguracionMarca() {
+            document.documentElement.style.setProperty('--primary', configMarca.primary || '#1a1a1a');
+            document.documentElement.style.setProperty('--accent', configMarca.accent || '#ff3366');
+            
+            const tituloTienda = configMarca.storeTitle || currentStoreData.nombre;
+            document.getElementById('page-title').innerText = tituloTienda;
+            document.getElementById('header-title').innerText = currentStoreData.nombre;
+
+            if (configMarca.favicon) {
+                document.getElementById('favicon-link').href = configMarca.favicon;
+            }
+
+            const logoEl = document.getElementById('header-logo');
+            const titleEl = document.getElementById('header-title');
+
+            if (configMarca.logo) {
+                logoEl.src = configMarca.logo;
+                logoEl.style.display = 'block';
+                titleEl.style.display = 'none';
+            } else {
+                logoEl.style.display = 'none';
+                titleEl.style.display = 'block';
+            }
+        }
+
+        function syncColorInput(tipo, val) {
+            document.getElementById(`cfg-${tipo}`).value = val;
+        }
+
+        function cambiarVista(vistaId) {
+            if(vistaId === 'admin' && !adminAutenticado) return;
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-' + vistaId).classList.add('active');
+            window.scrollTo(0, 0);
+            
+            if(vistaId === 'catalog') renderCatalog();
+            if(vistaId === 'admin') {
+                actualizarDatalistCategorias();
+                renderAdminProductos();
+                renderAdminPedidos();
+                renderAdminClientes();
+                cargarFormConfig();
+                generarDashboard();
+            }
+        }
+
+        function actualizarDatalistCategorias() {
+            const list = document.getElementById('category-list');
+            const categorias = [...new Set(productos.map(p => p.category))];
+            list.innerHTML = categorias.map(c => `<option value="${c}">`).join('');
+        }
+
+        function renderCategorias() {
+            const container = document.getElementById('category-filters');
+            const categorias = ['todos', ...new Set(productos.filter(p => p.active !== false).map(p => p.category))];
+            
+            container.innerHTML = categorias.map(cat => `
+                <button class="filter-btn ${categoriaActual === cat ? 'active' : ''}" onclick="filtrarCategoria('${cat}')">
+                    ${cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </button>
+            `).join('');
+        }
+
+        function filtrarCategoria(cat) {
+            categoriaActual = cat;
+            renderCategorias();
+            renderCatalog();
+        }
+
+        function renderCatalog() {
+            renderCategorias();
+            const grid = document.getElementById('product-grid');
+            const query = document.getElementById('search-input').value.toLowerCase();
+
+            let filtrados = productos.filter(p => p.active !== false);
+            if (categoriaActual !== 'todos') filtrados = filtrados.filter(p => p.category === categoriaActual);
+            if (query) filtrados = filtrados.filter(p => p.titulo.toLowerCase().includes(query) || p.desc.toLowerCase().includes(query));
+
+            if(filtrados.length === 0) {
+                grid.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">No hay productos disponibles.</p>';
+                return;
+            }
+
+            grid.innerHTML = filtrados.map(p => `
+                <div class="product-card">
+                    <img src="${p.img}" alt="${p.titulo}" class="product-img">
+                    <div class="product-info">
+                        <div class="product-ref">Ref: ${p.referencia || 'S/R'}</div>
+                        <h3 class="product-title">${p.titulo}</h3>
+                        <p class="product-desc">${p.desc}</p>
+                        <div class="price-box">${formatPrice(p.price)}</div>
+                        <div style="display:flex; gap:8px; align-items:center; margin-top:auto;">
+                            <input type="number" id="qty-${p.id}" value="1" min="1" style="width: 50px; padding: 6px; text-align: center; border:1px solid #ccc; border-radius:4px;">
+                            <button class="btn-add" onclick="agregarAlCarrito(${p.id})">Añadir</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleCartDrawer(abrir) {
+            const drawer = document.getElementById('cart-drawer');
+            const overlay = document.getElementById('cart-overlay');
+            if(abrir) {
+                drawer.classList.add('open'); overlay.classList.add('open'); renderCartDrawer();
+            } else {
+                drawer.classList.remove('open'); overlay.classList.remove('open');
+            }
+        }
+
+        function agregarAlCarrito(id) {
+            const prod = productos.find(p => p.id === id);
+            const cantidad = parseInt(document.getElementById(`qty-${id}`).value) || 1;
+
+            const itemExistente = carrito.find(item => item.id === id);
+            if(itemExistente) {
+                itemExistente.cantidad += cantidad;
+            } else {
+                carrito.push({
+                    id: prod.id, referencia: prod.referencia, titulo: prod.titulo, 
+                    precioUnitario: prod.price, cantidad: cantidad, img: prod.img
+                });
+            }
+
+            actualizarContadorCarrito();
+            mostrarAlerta('Producto añadido al carrito.');
+            toggleCartDrawer(true);
+        }
+
+        function actualizarContadorCarrito() {
+            const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
+            document.getElementById('cart-count').innerText = totalItems;
+            localStorage.setItem('cart_' + storeSlug, JSON.stringify(carrito));
+        }
+
+        function renderCartDrawer() {
+            const container = document.getElementById('cart-drawer-content');
+            const footer = document.getElementById('cart-drawer-footer');
+
+            if(carrito.length === 0) {
+                container.innerHTML = '<p style="text-align:center; opacity:0.7;">Tu carrito está vacío.</p>';
+                footer.style.display = 'none';
+                return;
+            }
+
+            footer.style.display = 'block';
+            let totalGeneral = 0;
+            let html = '';
+
+            carrito.forEach((item, index) => {
+                const subtotal = item.precioUnitario * item.cantidad;
+                totalGeneral += subtotal;
+                html += `
+                    <div style="display:flex; gap:10px; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px; align-items:center;">
+                        <img src="${item.img}" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
+                        <div style="flex:1;">
+                            <div style="font-weight:bold; font-size:0.9rem;">${item.titulo}</div>
+                            <div style="font-size:0.85rem; color:var(--accent); font-weight:bold;">${formatPrice(subtotal)}</div>
+                            <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+                                <input type="number" value="${item.cantidad}" min="1" style="width:45px; text-align:center;" onchange="cambiarCantidadCart(${index}, this.value)">
+                                <button onclick="eliminarItemCart(${index})" style="background:none; border:none; color:red; cursor:pointer;">Quitar</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            document.getElementById('cart-total-text').innerText = `Total: ${formatPrice(totalGeneral)}`;
+        }
+
+        function cambiarCantidadCart(index, nuevaCant) {
+            carrito[index].cantidad = parseInt(nuevaCant) || 1;
+            actualizarContadorCarrito(); renderCartDrawer();
+        }
+
+        function eliminarItemCart(index) {
+            carrito.splice(index, 1);
+            actualizarContadorCarrito(); renderCartDrawer();
+        }
+
+        function enviarWhatsApp() {
+            const nombre = document.getElementById('client-name').value.trim();
+            const telefonoCli = document.getElementById('client-phone').value.trim();
+            if(!nombre || !telefonoCli) { alert('Introduce tu nombre y teléfono.'); return; }
+
+            clientes.unshift({ id: Date.now(), nombre, telefono: telefonoCli, pedido: JSON.parse(JSON.stringify(carrito)), fecha: new Date().toLocaleString() });
+            
+            let total = 0;
+            let mensaje = `Hola, ¡me gustaría realizar este pedido en *${currentStoreData.nombre}*! 📋✨\n👤 *Cliente:* ${nombre}\n📞 *Teléfono:* ${telefonoCli}\n\n`;
+            let itemsPedido = [];
+
+            carrito.forEach((item, i) => {
+                let subtotal = item.precioUnitario * item.cantidad;
+                total += subtotal;
+                mensaje += `${i + 1}. *[Ref: ${item.referencia}] ${item.titulo}*\n   - Cantidad: ${item.cantidad}\n   - Subtotal: ${formatPrice(subtotal)}\n\n`;
+                itemsPedido.push(`[${item.referencia}] ${item.cantidad}x ${item.titulo}`);
+            });
+
+            mensaje += `*Total General: ${formatPrice(total)}*`;
+
+            pedidos.unshift({ id: Date.now(), cliente: nombre, telefono: telefonoCli, resumen: itemsPedido.join(', '), total: total, fecha: new Date().toLocaleString(), items: carrito, entregado: false });
+            sincronizarConSupabase();
+
+            const url = `https://wa.me/${configMarca.wa || ''}?text=${encodeURIComponent(mensaje)}`;
+            window.open(url, '_blank');
+
+            carrito = []; actualizarContadorCarrito(); toggleCartDrawer(false);
+            mostrarAlerta('Pedido enviado con éxito.');
+        }
+
+        // --- GESTIÓN DE IMÁGENES ---
+        const dropZone = document.getElementById('drop-zone');
+        dropZone.addEventListener('click', () => document.getElementById('p-img-file').click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.background = '#eee'; });
+        dropZone.addEventListener('dragleave', () => dropZone.style.background = '#fafafa');
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault(); dropZone.style.background = '#fafafa';
+            if(e.dataTransfer.files[0]) procesarArchivoImagen(e.dataTransfer.files[0]);
+        });
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            for(let i=0; i<items.length; i++) if(items[i].type.indexOf('image') !== -1) procesarArchivoImagen(items[i].getAsFile());
+        });
+
+        function cargarImagenInput(input) { if(input.files[0]) procesarArchivoImagen(input.files[0]); }
+        function procesarArchivoImagen(file) {
+            const reader = new FileReader();
+            reader.onload = e => abrirRecortador(e.target.result);
+            reader.readAsDataURL(file);
+        }
+        function abrirRecortador(dataUrl) {
+            document.getElementById('image-to-crop').src = dataUrl;
+            document.getElementById('cropper-modal').style.display = 'flex';
+            if(cropper) cropper.destroy();
+            cropper = new Cropper(document.getElementById('image-to-crop'), { aspectRatio: 1, viewMode: 1, autoCropArea: 0.9 });
+        }
+        function abrirRecortadorActual() { if(imagenBase64Actual) abrirRecortador(imagenBase64Actual); }
+        function cerrarRecortador() { document.getElementById('cropper-modal').style.display = 'none'; if(cropper) cropper.destroy(); }
+        function guardarRecorte() {
+            if(!cropper) return;
+            imagenBase64Actual = cropper.getCroppedCanvas({ width: 600, height: 600 }).toDataURL('image/jpeg', 0.8);
+            document.getElementById('img-preview').src = imagenBase64Actual;
+            document.getElementById('img-preview-container').style.display = 'block';
+            cerrarRecortador(); mostrarAlerta('Imagen preparada.');
+        }
+
+        // --- ADMIN DE TIENDA ---
+        function cambiarTabAdmin(tabId) {
+            document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('admin-sec-' + tabId).classList.add('active');
+        }
+
+        function guardarProducto(e) {
+            e.preventDefault();
+            if(!imagenBase64Actual) { alert('Agrega una imagen.'); return; }
+
+            const editId = document.getElementById('p-edit-id').value;
+            let referenciaGenerada = editId ? productos.find(p => p.id === Number(editId)).referencia : 'REF-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+            const nuevoProd = {
+                id: editId ? Number(editId) : Date.now(),
+                referencia: referenciaGenerada,
+                titulo: document.getElementById('p-title').value,
+                category: document.getElementById('p-category').value.trim().toLowerCase(),
+                desc: document.getElementById('p-desc').value,
+                img: imagenBase64Actual,
+                price: Number(document.getElementById('p-price').value),
+                active: true
+            };
+
+            if(editId) {
+                const idx = productos.findIndex(p => p.id === Number(editId));
+                if(idx !== -1) { nuevoProd.active = productos[idx].active; productos[idx] = nuevoProd; }
+                cancelarEdicionProd();
+            } else {
+                productos.unshift(nuevoProd);
+                document.getElementById('product-form').reset();
+                document.getElementById('img-preview-container').style.display = 'none'; imagenBase64Actual = '';
+            }
+
+            sincronizarConSupabase();
+            actualizarDatalistCategorias();
+            renderAdminProductos();
+            mostrarAlerta('Producto guardado con éxito.');
+        }
+
+        function renderAdminProductos() {
+            const listEl = document.getElementById('admin-product-list');
+            if(productos.length === 0) { listEl.innerHTML = '<p>No hay productos registrados.</p>'; return; }
+
+            let html = `<table><tr><th>Img</th><th>Ref</th><th>Título</th><th>Precio</th><th>Acciones</th></tr>`;
+            productos.forEach(p => {
+                html += `<tr>
+                    <td><img src="${p.img}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;"></td>
+                    <td><b>${p.referencia}</b></td>
+                    <td><b>${p.titulo}</b></td><td>${formatPrice(p.price)}</td>
+                    <td>
+                        <button onclick="editarProd(${p.id})" style="background:#007bff;color:white;border:none;padding:4px;border-radius:4px;cursor:pointer;">Editar</button>
+                        <button onclick="eliminarProd(${p.id})" style="background:var(--accent);color:white;border:none;padding:4px;border-radius:4px;cursor:pointer;">Eliminar</button>
+                    </td>
+                </tr>`;
+            });
+            listEl.innerHTML = html + `</table>`;
+        }
+
+        function editarProd(id) {
+            const p = productos.find(item => item.id === id);
+            if(!p) return;
+            document.getElementById('p-edit-id').value = p.id;
+            document.getElementById('p-title').value = p.titulo;
+            document.getElementById('p-category').value = p.category;
+            document.getElementById('p-desc').value = p.desc;
+            document.getElementById('p-price').value = p.price;
+            imagenBase64Actual = p.img;
+            document.getElementById('img-preview').src = p.img;
+            document.getElementById('img-preview-container').style.display = 'block';
+            document.getElementById('form-product-title').innerText = 'Editar Producto';
+            document.getElementById('btn-guardar-prod').innerText = 'Actualizar';
+            document.getElementById('btn-cancelar-edit').style.display = 'block';
+            window.scrollTo(0,0);
+        }
+
+        function cancelarEdicionProd() {
+            document.getElementById('product-form').reset();
+            document.getElementById('p-edit-id').value = '';
+            document.getElementById('img-preview-container').style.display = 'none';
+            imagenBase64Actual = '';
+            document.getElementById('form-product-title').innerText = 'Agregar Nuevo Producto';
+            document.getElementById('btn-guardar-prod').innerText = 'Guardar Producto';
+            document.getElementById('btn-cancelar-edit').style.display = 'none';
+        }
+
+        function eliminarProd(id) {
+            if(confirm('¿Eliminar producto?')) {
+                productos = productos.filter(p => p.id !== id);
+                sincronizarConSupabase();
+                renderAdminProductos();
+            }
+        }
+
+        function generarDashboard() {
+            document.getElementById('dash-ventas-semana').innerText = pedidos.length;
+            let totalGeneral = pedidos.reduce((sum, p) => sum + p.total, 0);
+            document.getElementById('dash-ingresos-mes').innerText = formatPrice(totalGeneral);
+        }
+
+        function renderAdminPedidos() {
+            const listEl = document.getElementById('admin-orders-list');
+            if(pedidos.length === 0) { listEl.innerHTML = '<p>No hay pedidos.</p>'; return; }
+            let html = `<table><tr><th>Fecha</th><th>Cliente</th><th>Resumen</th><th>Total</th></tr>`;
+            pedidos.forEach(o => {
+                html += `<tr><td><small>${o.fecha}</small></td><td><b>${o.cliente}</b><br>${o.telefono}</td><td>${o.resumen}</td><td style="font-weight:bold; color:var(--accent);">${formatPrice(o.total)}</td></tr>`;
+            });
+            listEl.innerHTML = html + `</table>`;
+        }
+
+        function renderAdminClientes() {
+            const listEl = document.getElementById('admin-clients-list');
+            if(clientes.length === 0) { listEl.innerHTML = '<p>No hay clientes.</p>'; return; }
+            let html = `<table><tr><th>Fecha</th><th>Nombre</th><th>Teléfono</th></tr>`;
+            clientes.forEach(c => {
+                html += `<tr><td><small>${c.fecha}</small></td><td><b>${c.nombre}</b></td><td><a href="https://wa.me/${c.telefono}" target="_blank">${c.telefono}</a></td></tr>`;
+            });
+            listEl.innerHTML = html + `</table>`;
+        }
+
+        function cargarFormConfig() {
+            document.getElementById('cfg-store-title').value = configMarca.storeTitle || currentStoreData.nombre;
+            document.getElementById('cfg-primary').value = configMarca.primary || '#1a1a1a';
+            document.getElementById('cfg-primary-picker').value = configMarca.primary || '#1a1a1a';
+            document.getElementById('cfg-accent').value = configMarca.accent || '#ff3366';
+            document.getElementById('cfg-accent-picker').value = configMarca.accent || '#ff3366';
+            document.getElementById('cfg-currency-base').value = configMarca.currencyBase || 'USD';
+            document.getElementById('cfg-wa').value = configMarca.wa || '';
+        }
+
+        async function guardarConfiguracion(e) {
+            e.preventDefault();
+            configMarca.storeTitle = document.getElementById('cfg-store-title').value.trim();
+            configMarca.primary = document.getElementById('cfg-primary').value;
+            configMarca.accent = document.getElementById('cfg-accent').value;
+            configMarca.currencyBase = document.getElementById('cfg-currency-base').value;
+            configMarca.wa = document.getElementById('cfg-wa').value.trim();
+
+            const nuevoPin = document.getElementById('cfg-new-pin').value.trim();
+            if(nuevoPin) configMarca.adminPinHash = await hashPin(nuevoPin);
+
+            const logoFile = document.getElementById('cfg-logo-file').files[0];
+            const faviconFile = document.getElementById('cfg-favicon-file').files[0];
+
+            const procesarArchivos = async () => {
+                if (logoFile) {
+                    await new Promise(resolve => {
+                        const r = new FileReader();
+                        r.onload = evt => { configMarca.logo = evt.target.result; resolve(); };
+                        r.readAsDataURL(logoFile);
+                    });
+                }
+                if (faviconFile) {
+                    await new Promise(resolve => {
+                        const r = new FileReader();
+                        r.onload = evt => { configMarca.favicon = evt.target.result; resolve(); };
+                        r.readAsDataURL(faviconFile);
+                    });
+                }
+                await sincronizarConSupabase();
+                aplicarConfiguracionMarca();
+                mostrarAlerta('Configuración guardada.');
+            };
+
+            procesarArchivos();
+        }
+
+        // --- SUPERADMIN ---
+        async function cargarListaSuperadmin() {
+            const { data, error } = await supabaseClient.from('tiendas').select('id, nombre, pais, config');
+            const listEl = document.getElementById('superadmin-stores-list');
+            if(error || !data) { listEl.innerHTML = '<p>Error al cargar tiendas.</p>'; return; }
+
+            let html = `<table><tr><th>Slug / ID</th><th>Nombre</th><th>País</th><th>Link Tienda</th><th>Acciones</th></tr>`;
+            data.forEach(t => {
+                let link = `${window.location.origin}${window.location.pathname}?t=${t.id}`;
+                html += `<tr>
+                    <td><b>${t.id}</b></td>
+                    <td>${t.nombre}</td>
+                    <td>${t.pais}</td>
+                    <td><a href="${link}" target="_blank">Abrir Tienda 🔗</a></td>
+                    <td>
+                        <button onclick="window.open('${link}&admin=true', '_blank')" style="background:#28a745;color:white;border:none;padding:4px;border-radius:4px;cursor:pointer;">Entrar Admin</button>
+                        <button onclick="eliminarTiendaSuperadmin('${t.id}')" style="background:red;color:white;border:none;padding:4px;border-radius:4px;cursor:pointer;">Borrar</button>
+                    </td>
+                </tr>`;
+            });
+            listEl.innerHTML = html + `</table>`;
+        }
+
+        async function crearTiendaSuperadmin(e) {
+            e.preventDefault();
+            const slug = document.getElementById('sa-slug').value.trim().toLowerCase();
+            const nombre = document.getElementById('sa-name').value.trim();
+            const pais = document.getElementById('sa-country').value;
+            const moneda = document.getElementById('sa-currency').value;
+            const wa = document.getElementById('sa-wa').value.trim();
+
+            const nuevaTienda = {
+                id: slug,
+                nombre: nombre,
+                pais: pais,
+                config: { primary: '#1a1a1a', accent: '#ff3366', currencyBase: moneda, wa: wa, adminPinHash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4' },
+                productos: [],
+                pedidos: [],
+                clientes: []
+            };
+
+            const { error } = await supabaseClient.from('tiendas').insert([nuevaTienda]);
+            if(error) { alert('Error al crear tienda: ' + error.message); return; }
+
+            alert('¡Tienda creada con éxito! Link: ' + window.location.origin + window.location.pathname + '?t=' + slug);
+            document.getElementById('superadmin-form').reset();
+            cargarListaSuperadmin();
+        }
+
+        async function eliminarTiendaSuperadmin(slug) {
+            if(confirm(`¿Estás seguro de borrar la tienda ${slug}?`)) {
+                await supabaseClient.from('tiendas').delete().eq('id', slug);
+                cargarListaSuperadmin();
+            }
+        }
+
+        // --- ACCESO ADMIN LOCAL ---
+        document.getElementById('secret-trigger').addEventListener('click', async () => {
+            if(adminAutenticado) { cambiarVista('admin'); return; }
+            const pin = prompt('PIN de administrador de la tienda (Por defecto: 1234):'); if (!pin) return;
+            const hashHex = await hashPin(pin);
+            if (hashHex === configMarca.adminPinHash) { adminAutenticado = true; cambiarVista('admin'); } else { alert('PIN incorrecto'); }
+        });
+
+        function cerrarSesionAdmin() {
+            adminAutenticado = false;
+            cambiarVista('catalog');
+            mostrarAlerta('Sesión cerrada.');
+        }
+
+        if(urlParams.get('admin') === 'true') {
+            adminAutenticado = true;
+            setTimeout(() => cambiarVista('admin'), 500);
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
